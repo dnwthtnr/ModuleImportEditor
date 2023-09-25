@@ -1,0 +1,12 @@
+{
+  "Target Module": "",
+  "Edit Settings": {
+    "Parse And Replace": {
+      "0": ["(from pyqt_interface_elements )", "from . "]
+    }
+  },
+  "Output Settings": {
+    "Overwrite Target Module": false,
+    "Output Location": ""
+  }
+}
