@@ -1,11 +1,11 @@
 import os, sys, re
 
 from source import file_management
+from source.ModuleImportEditor import keys
 
+defaultConfigPath = "config.json"
 
-configPath = "config.json"
-
-def readConfig(path=configPath):
+def readConfig(path=None):
     """
     Reads the given config path
     Parameters
@@ -18,13 +18,17 @@ def readConfig(path=configPath):
         Data from config
 
     """
+    if path is None:
+        path = defaultConfigPath
+
     if not os.path.exists(path):
         raise FileNotFoundError(f'File: {path} does not exist.')
 
     data = file_management.read_json(path)
     return data
 
-def writeConfig(data, outputPath=configPath):
+
+def writeConfig(data, outputPath=None):
     """
     Writes teh given config data
 
@@ -34,9 +38,35 @@ def writeConfig(data, outputPath=configPath):
     outputPath
 
     """
+    if outputPath is None:
+        outputPath = defaultConfigPath
+
+
     if not isinstance(data, dict):
         raise TypeError(f'Given data must be dictionary')
     file_management.write_json(path=outputPath, data=data)
+
+
+def readSubstitutionQueueDict(configPath=None):
+    if configPath is None:
+        configPath = defaultConfigPath
+
+    _data = readConfig(configPath)
+
+    _substitutionQueueDict = _data.get(keys.substitutionQueueDictKey)
+
+    if _substitutionQueueDict is None:
+        raise KeyError(f'Key: {keys.substitutionQueueDictKey} not in provided config.')
+
+    return _substitutionQueueDict
+
+
+def writeSubstitutionQueueDict(substitutionQueueDict, configPath=None):
+    if configPath is None:
+        configPath = defaultConfigPath
+    _data = readConfig(configPath)
+    _data[keys.substitutionQueueDictKey] = substitutionQueueDict
+    writeConfig(_data, configPath)
 
 
 # region Perform Replacement Actions
@@ -120,7 +150,7 @@ def iteritiveParseAndReplace(targetString, substitutions):
         pattern = substitutionList[0]
         replacementText = substitutionList[1]
 
-        resultString = parseAndReplace(targetString=targetString, regexPattern=pattern, replacementText=replacementText)
+        resultString = parseAndReplace(targetString=resultString, regexPattern=pattern, replacementText=replacementText)
 
     return resultString
 
@@ -142,6 +172,9 @@ def parseAndReplaceModule(moduleDirectory, outputDirectory, substitutions, fileE
 
     """
 
+    if not os.path.exists(outputDirectory):
+        os.mkdir(outputDirectory)
+
 
     # region Run Replacements on Files
     targetFiles = [
@@ -149,13 +182,24 @@ def parseAndReplaceModule(moduleDirectory, outputDirectory, substitutions, fileE
     ]
     for filename in targetFiles:
         _filepath = os.path.join(moduleDirectory, filename)
-        _fileData = file_management.readFile(_filepath)
+        _outputFilepath = os.path.join(outputDirectory, filename)
+
+        # if there have already been edits to the file it will be written here. Otherwise it will override past changes
+        if os.path.exists(_outputFilepath):
+            print('exists', _outputFilepath)
+            _filepath = _outputFilepath
+
+
+        try:
+            _fileData = file_management.readFile(_filepath)
+        except Exception as e:
+            print(f'File cant be read: {_filepath}')
+            continue
 
         if not isinstance(_fileData, str):
             continue
 
         _result = iteritiveParseAndReplace(targetString=_fileData, substitutions=substitutions)
-        _outputFilepath = os.path.join(outputDirectory, filename)
         file_management.writeFile(_outputFilepath, _result)
     # endregion
 
@@ -190,6 +234,19 @@ if __name__ == "__main__":
 
     # print(isValidSubstitionList(["(from pyqt_interface_elements )", "from . "]))
 
-    testpath = r"Q:\__packages\_GitHub\testfilepath"
-    output = r"Q:\__packages\_GitHub\testpath2"
-    parseAndReplaceModule(moduleDirectory=testpath, outputDirectory=output, substitutions=[["(from pyqt_interface_elements )", "from . "]])
+    testpath = r"Q:\__packages\_GitHub\animation_exporter\lib\PySideWrapper\source\PySideWrappers"
+    output = r"Q:\__packages\_GitHub\animation_exporter\lib\PySideWrapper\source\PySideWrappers"
+    # parseAndReplaceModule(moduleDirectory=testpath, outputDirectory=output, substitutions=[
+    #     ["(QtCore.Signal)", "QtCore.pyqtSignal"],
+    #     ["(QtWidgets.QSizePolicy.)", "QtWidgets.QSizePolicy.Policy."],
+    #     ["(QtWidgets.QStyle.SC)", "QtWidgets.QStyle.SubControl.SC"],
+    #     ["(QtWidgets.QStyle.CC)", "QtWidgets.QStyle.ComplexController.CC"],
+    #     ["(QtCore.Slot)", "QtCore.pyqtSlot"] ]
+    #                       )
+    parseAndReplaceModule(
+        moduleDirectory=testpath,
+        outputDirectory=output,
+        substitutions=[
+            ["(from . import)", "import"]
+        ]
+    )
